@@ -1,0 +1,4 @@
+# Each line will be printed delayed by a couple of seconds
+There is a really important topic to discuss here
+I forgot what it was about, but it probably had to do with the existential purpose of my existance.
+Think about it!

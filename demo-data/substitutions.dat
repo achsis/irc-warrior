@@ -1,0 +1,13 @@
+##############
+#G1,G2,semicolon-separated possible substitutions
+#G1: Text to substitute
+#G2: Probability that G1 is substituted * 1000
+##############
+%U,1000,%U: ;%U, ;;
+%S1,1000,:-);:->
+%S7,1000,:-/;:-|;
+%S9,1000,:-(;
+%A,1000,TheMightyBuzzard, ;TheMightyBuzzard: ;
+it is,500,it's
+it's,500,it is
+ ,1,  ;;

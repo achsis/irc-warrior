@@ -1,0 +1,12 @@
+######################
+# First non-comment line is the probabiliy of a reply * 100 (100 means: always reply)
+######################
+probability:95
+######################
+# N,M Replytext
+# N: Minimum delay in seconds
+# M: Maximum delay in seconds
+# Replytext: Text replied to either sender (when private message) or group (when public message)
+######################
+3,10 %UYou just used the word trigger. I like to discuss trigger.
+3,10 %UTrigger is the word you just used. 
