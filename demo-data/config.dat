@@ -1,0 +1,16 @@
+#Default values for src/sockpuppet.py
+#
+# Run 'python src/sockpuppet.py --help' for further explanation
+# 
+#Please leave the values for "host" and "client_server" here, the script itselft
+#does not provide sensible defaults
+host=0
+client_server=*
+
+server=localhost:6667
+nick=irc-warrior
+user=IrcWarrior
+nickservpwd=yeahsureiwillputthatinmygithub
+password=
+realname=Puppet Master
+logfile=log.raw

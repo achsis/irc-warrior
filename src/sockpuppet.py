@@ -10,6 +10,7 @@ from environment import *
 class sockpuppet:
     def __init__(self):
         random.seed()
+        self.readConfig()
         self.args = self.get_args()
 
         if len(self.args.logfile) > 0:
@@ -61,19 +62,32 @@ class sockpuppet:
         self.handler[re.compile("^PRIVMSG ([#!&]..*) :([^ ]*)\+\+.*")] = self.see_karma
         self.handler_system[re.compile("^PING (.*)")] = self.ping
         self.handler_system[re.compile("^NOTICE " + self.args.nick + " :.*identify via .*")] = self.identify
-        
+
+    def readConfig(self):
+        conf = readFile(os.path.join(getDataFolder(), "config.dat"))
+        self.conf = {}
+        confRe = re.compile("^\s*([^\s=]+)\s*=\s*(.*)$")
+        for l in conf:
+            m = confRe.match(l.strip())
+            if None != m:
+                self.conf[m.group(1)]=m.group(2)
+
+    def getConf(self, prop):
+        if prop in self.conf.keys():
+            return self.conf[prop]
+        return "undefined"
+    
     def get_args(self):
         parser = argparse.ArgumentParser(description='Helper to build a socket army in IRC chats')
-        #parser.add_argument('--server', default='chat.soylentnews.org:6667', help='domain-name/port of IRC server')
-        parser.add_argument('--server', default='localhost:6667', help='domain-name/port of IRC server')
-        parser.add_argument('--host', default='0', help='desired hostname')
-        parser.add_argument('--client_server', default='*', help='desired client server name')
-        parser.add_argument('--user', default='irc-warrior', help='desired username in channel')
-        parser.add_argument('--nick', default='IrcWarrior', help='desired nickname in channel')
-        parser.add_argument('--nickservpwd', default='', help='NickServ password for this user')
-        parser.add_argument('--password', default='', help='password (if required for this server)')
-        parser.add_argument('--realname', default='Puppet Master', help='"Real Name" of the script')
-        parser.add_argument('--logfile', default='', help='Logfile; should log anything sent or received')
+        parser.add_argument('--server', default = self.getConf("server"), help='domain-name/port of IRC server')
+        parser.add_argument('--host', default=self.getConf("host"), help='desired hostname')
+        parser.add_argument('--client_server', default=self.getConf("client_server"), help='desired client server name')
+        parser.add_argument('--user', default=self.getConf("user"), help='desired username in channel')
+        parser.add_argument('--nick', default=self.getConf("nick"), help='desired nickname in channel')
+        parser.add_argument('--nickservpwd', default=self.getConf("nickservpwd"), help='NickServ password for this user')
+        parser.add_argument('--password', default=self.getConf("password"), help='password (if required for this server)')
+        parser.add_argument('--realname', default=self.getConf("realname"), help='"Real Name" of the script')
+        parser.add_argument('--logfile', default=self.getConf("logfile"), help='Logfile; should log anything sent or received')
         parser.add_argument('--proxy', dest='feature', action='store_true')
         parser.set_defaults(proxy=False)
         args = parser.parse_args()
