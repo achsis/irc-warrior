@@ -53,6 +53,7 @@ class sockpuppet:
             word = f[len(os.path.join(getDataFolder(), "react/")):-4]
             self.handler[re.compile("^PRIVMSG (.+) :\s*(" + word + ")[sz]*[\s$,\.?!].*",re.I)] = self.react
             self.handler[re.compile("^PRIVMSG (.+) :[^^#!~]+.*\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.react
+        self.handler[re.compile("^PRIVMSG ([#!&]..*) :#smake\s+([^\s]+)\s+(.*)$")] = self.smake
         self.handler[re.compile("^PRIVMSG .*")] = self.activity
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reflect (..*)")] = self.reflect
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :discussNow (..*)")] = self.discussNow
@@ -158,6 +159,11 @@ class sockpuppet:
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
         
         
+    def smake(self, message, m):
+        if m.group(2)==self.args.nick:
+            self.send("PRIVMSG " + m.group(1) + " :" + u'\u0001' + "ACTION ducks fast" + u'\u0001')
+            self.enqueue("PRIVMSG " + m.group(1) + " :#smake " + message.nick + " with a rotten fish of justice", 0)
+            
     def reflect(self, message, m):
         if message.nick in self.authorized_users:
             self.send(m.group(1))
