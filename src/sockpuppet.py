@@ -36,6 +36,9 @@ class sockpuppet:
         self.ignoreOthers = False
         self.main_loop()
 
+    def substitute(self, line):
+        return line.replace("%n",self.args.nick)
+
     def reinitialize(self):
         print "Re-loading data..."
         self.users = Users()
@@ -124,9 +127,13 @@ class sockpuppet:
         destination = m.group(1)
         if not m.group(1)[0:1] in "#&!":
             destination = message.nick
-        result = pick_random_delayed(os.path.join(getDataFolder(), "bad_karma/" + m.group(2).lower() + ".txt"), message, m.group(2))
+        filename = m.group(2).lower()
+        if filename == self.args.nick:
+            filename = "mynick"
+        result = pick_random_delayed(os.path.join(getDataFolder(), "bad_karma/" + filename + ".txt"), message, m.group(2))
         for t in result:
             (te,ti) = t
+            te = self.substitute(te)
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
 
     def trigger(self, message, m):

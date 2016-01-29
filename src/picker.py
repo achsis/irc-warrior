@@ -48,7 +48,7 @@ def pick_random_delayed(filename, message, word):
         probabilityRe = re.compile("probability:(\d\d*)")
         lines = readFile(filename)
         if len(lines) < 1:
-            return ("",0)
+            return []
             
         m = probabilityRe.match(lines[0])
         probability = 50
@@ -60,7 +60,7 @@ def pick_random_delayed(filename, message, word):
         print "probability = " + str(probability) + ", i = " + str(i)
         if i > probability:
             print "probability = " + str(probability)
-            return ("",0)
+            return []
             
         choice = lines[random.randint(0,len(lines)-1)]
         choice = substitute(choice, message, word)
@@ -83,5 +83,5 @@ def pick_random_delayed(filename, message, word):
         return result
     else:
         print "Missing file " + filename
-    return ("",0)
+    return []
 
