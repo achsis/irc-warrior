@@ -128,14 +128,23 @@ class sockpuppet:
         if not m.group(1)[0:1] in "#&!":
             destination = message.nick
         filename = m.group(2).lower()
-        if filename == self.args.nick:
+        if filename == self.args.nick.lower():
             filename = "mynick"
+            self.increase_own_karma(message, m)
         result = pick_random_delayed(os.path.join(getDataFolder(), "bad_karma/" + filename + ".txt"), message, m.group(2))
         for t in result:
             (te,ti) = t
             te = self.substitute(te)
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
 
+    def increase_own_karma(self, message, m):
+        destination = m.group(1)
+        if not m.group(1)[0:1] in "#&!":
+            destination = message.nick
+        self.enqueue("NICK " + self.args.nick + "_tmp" + "\n",1)
+        self.enqueue("PRIVMSG " + destination + " :" + self.args.nick + "++\n", 1)
+        self.enqueue("NICK " + self.args.nick + "\n",1)
+        
     def trigger(self, message, m):
         print "Triggered trigger " + message.message
         i = random.randint(0,200)
