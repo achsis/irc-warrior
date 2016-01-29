@@ -64,7 +64,6 @@ def pick_random_delayed(filename, message, word):
             
         choice = lines[random.randint(0,len(lines)-1)]
         choice = substitute(choice, message, word)
-            
         m = delayRe.match(choice)
         ti = 0
         if None != m:
@@ -75,7 +74,13 @@ def pick_random_delayed(filename, message, word):
             print "No Match: " +  choice
             ti = random.randint(3,6)
             te =  choice
-        return (te,ti)
+
+        choices = te.split("\\n")
+        result = []
+        for c in choices:
+            result.append((c,ti))
+            ti=ti + len(te)/8 + 1
+        return result
     else:
         print "Missing file " + filename
     return ("",0)

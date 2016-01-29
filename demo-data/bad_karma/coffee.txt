@@ -1,0 +1,12 @@
+######################
+# Files in this folder define the behaviour on $word++, when someone tries to increase the carma of a word.
+# First non-comment line is the probabiliy of a reply * 100 (100 means: always reply)
+######################
+probability:80
+######################
+# N,M Replytext
+# N: Minimum delay in seconds
+# M: Maximum delay in seconds
+# Replytext: Text replied to either sender (when private message) or group (when public message)
+######################
+4,6 %USo... coffee-- means you went to the toilet?

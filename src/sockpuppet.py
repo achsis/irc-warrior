@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse, socket, re, random, os, time, glob
 import socketproxy
 from users import *
@@ -47,19 +48,23 @@ class sockpuppet:
         for f in glob.glob(os.path.join(getDataFolder(), "trigger/*.txt")):
             word = f[len(os.path.join(getDataFolder(), "trigger/")):-4]
             self.handler[re.compile("^PRIVMSG (.+) :\s*(" + word + ")[sz]*[\s$,\.?!].*",re.I)] = self.trigger
-            self.handler[re.compile("^PRIVMSG (.+) :.+\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.trigger
+            self.handler[re.compile("^PRIVMSG (.+) :[^^#!~]+.*\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.trigger
         for f in glob.glob(os.path.join(getDataFolder(), "react/*.txt")):
             word = f[len(os.path.join(getDataFolder(), "react/")):-4]
             self.handler[re.compile("^PRIVMSG (.+) :\s*(" + word + ")[sz]*[\s$,\.?!].*",re.I)] = self.react
-            self.handler[re.compile("^PRIVMSG (.+) :.+\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.react
+            self.handler[re.compile("^PRIVMSG (.+) :[^^#!~]+.*\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.react
         self.handler[re.compile("^PRIVMSG .*")] = self.activity
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reflect (..*)")] = self.reflect
+        self.handler[re.compile("^PRIVMSG " + self.args.nick + " :discussNow (..*)")] = self.discussNow
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reinit.*")] = self.reinit
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :sayto ([^:,]+)[:,](..*)")] = self.sayto
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :do ([^:,]+)[:,](..*)")] = self.do
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :join (..*)")] = self.join
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :quit.*")] = self.quit_bob
         self.handler[re.compile("^PRIVMSG ([#!&]..*) :([^ ]*)\+\+.*")] = self.see_karma
+        self.handler[re.compile("^PRIVMSG ([#!&]..*) :([^ ]*)--.*")] = self.see_bad_karma
+        self.handler[re.compile("^PRIVMSG ([#!&]..*) :\s*\+\+([^ ]*)[$ ,!?\.].*")] = self.see_karma
+        self.handler[re.compile("^PRIVMSG ([#!&]..*) :\s--([^ ]*)[$ ,!?\.].*")] = self.see_bad_karma
         self.handler_system[re.compile("^PING (.*)")] = self.ping
         self.handler_system[re.compile("^NOTICE " + self.args.nick + " :.*identify via .*")] = self.identify
 
@@ -100,13 +105,31 @@ class sockpuppet:
         self.send("PONG " + m.group(1))
 
     def see_karma(self, message, m):
+        print "Triggered see_karma " + message.message
+        i = random.randint(0,100)
+        destination = m.group(1)
+        if not m.group(1)[0:1] in "#&!":
+            destination = message.nick
+        print m.group(2)+ " " + str(i)
+        result = pick_random_delayed(os.path.join(getDataFolder(), "karma/" + m.group(2).lower() + ".txt"), message, m.group(2))
+        for t in result:
+            (te,ti) = t
+            self.enqueue("PRIVMSG " + destination + " :" + te, ti)
+
+    def see_bad_karma(self, message, m):
+        print "Triggered see_bad_karma " + message.message
         i = random.randint(0,100)
         print m.group(2)+ " " + str(i)
-        (te,ti) = pick_random_delayed(os.path.join(getDataFolder(), "karma/" + m.group(2).lower() + ".txt"), message, m.group(2))
-        if len(te) > 0:
-            self.enqueue("PRIVMSG " + m.group(1) + " :" + te, ti)
+        destination = m.group(1)
+        if not m.group(1)[0:1] in "#&!":
+            destination = message.nick
+        result = pick_random_delayed(os.path.join(getDataFolder(), "bad_karma/" + m.group(2).lower() + ".txt"), message, m.group(2))
+        for t in result:
+            (te,ti) = t
+            self.enqueue("PRIVMSG " + destination + " :" + te, ti)
 
     def trigger(self, message, m):
+        print "Triggered trigger " + message.message
         i = random.randint(0,200)
         print m.group(2)+ " " + str(i)
         destination = m.group(1)
@@ -117,18 +140,21 @@ class sockpuppet:
         else:
             destination = message.nick
             
-        (te,ti) = pick_random_delayed(os.path.join(getDataFolder(), "trigger/" + m.group(2).lower() + ".txt"), message, m.group(2))
-        if len(te) > 0:
+        result = pick_random_delayed(os.path.join(getDataFolder(), "trigger/" + m.group(2).lower() + ".txt"), message, m.group(2))
+        for t in result:
+            (te,ti) = t
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
         
     def react(self, message, m):
+        print "Triggered react " + message.message
         print m.group(2)
         destination = m.group(1)
         if not m.group(1)[0:1] in "#&!":
             destination = message.nick
             
-        (te,ti) = pick_random_delayed(os.path.join(getDataFolder(), "react/" + m.group(2).lower() + ".txt"), message, m.group(2))
-        if len(te) > 0:
+        result = pick_random_delayed(os.path.join(getDataFolder(), "react/" + m.group(2).lower() + ".txt"), message, m.group(2))
+        for t in result:
+            (te,ti) = t
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
         
         
@@ -173,6 +199,14 @@ class sockpuppet:
             self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
             print message.nick + " not in " + str(self.authorized_users)
 
+    def discussNow(self, message, m):
+        if message.nick in self.authorized_users:
+            self.enqueue("PRIVMSG " + message.nick + " :Yes, my lord, certainly.", 0)
+            self.discuss(message, m)
+        else:
+            self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
+
+            
     def discuss(self, message, m):
         files = glob.glob(os.path.join(getDataFolder(), "discuss/*.txt"))
         print "Files: " + str(files)
