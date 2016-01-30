@@ -141,7 +141,7 @@ class sockpuppet:
         destination = m.group(1)
         if not m.group(1)[0:1] in "#&!":
             destination = message.nick
-        self.enqueue("NICK " + self.args.nick + "_tmp" + "\n",1)
+        self.enqueue("NICK " + self.args.nick + "_" + str(random.randint(1,100000)) + "\n",1)
         self.enqueue("PRIVMSG " + destination + " :" + self.args.nick + "++\n", 1)
         self.enqueue("NICK " + self.args.nick + "\n",1)
         
@@ -262,6 +262,13 @@ class sockpuppet:
             self.enqueue("PASS " + self.args.password + "\n",2)
         self.enqueue("NICK " + self.args.nick + "\n",2)
         self.enqueue("USER " + self.args.nick + " " + self.args.host + " " + self.args.client_server + " :" + self.args.realname + "\n",4)
+        init = readFile(os.path.join(getDataFolder(), "init.dat"))
+        reInit = re.compile("^(\d*),\s*(.*)$")
+        for l in init:
+            m = reInit.match(l)
+            if None != m:
+                self.enqueue(m.group(2), int(m.group(1))+4)
+                
 
     def enqueue(self, msg, countdown):
         if msg[-1:] != "\n":
