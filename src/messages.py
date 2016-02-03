@@ -1,4 +1,5 @@
 import socket
+from environment import *
 
 class OutMessage:
     def __init__(self, msg, countdown):
@@ -6,10 +7,9 @@ class OutMessage:
         self.countdown = countdown
 
 class OutMessages:
-    def __init__(self, sock, log):
+    def __init__(self, sock):
         self.messages = []
         self.sock = sock
-        self.logfile = log
     def add(self, msg, countdown):
         self.messages.append(OutMessage(msg,countdown))
 
@@ -23,9 +23,7 @@ class OutMessages:
                 self.messages[i].countdown = self.messages[i].countdown - 1
                 i = i + 1
             else:
-                print "Sending: " + self.messages[i].message
-                if None != self.logfile:
-                    self.logfile.write(self.messages[i].message + "\n")
+                Env.log.log(">" + self.messages[i].message)
                 self.sock.send(self.messages[i].message)
                 del self.messages[i] 
 
@@ -40,11 +38,12 @@ class Message:
         self.dump()
 
     def dump(self):
-        print "nick : " + self.nick
-        print "user : " + self.user
-        print "hostname : " + self.hostname
-        print "server : " + self.server
-        print "message : " + self.message
+        prio = 5
+        Env.log.log("nick : " + self.nick, prio)
+        Env.log.log("user : " + self.user, prio)
+        Env.log.log("hostname : " + self.hostname, prio)
+        Env.log.log("server : " + self.server, prio)
+        Env.log.log("message : " + self.message, prio)
         
     def _parse(self, msg):
         if msg.find(":") == 0 and msg.find(" ") > 0:

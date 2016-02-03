@@ -14,10 +14,7 @@ class sockpuppet:
         self.readConfig()
         self.args = self.get_args()
 
-        if len(self.args.logfile) > 0:
-            self.logfile = open(self.args.logfile,"w")
-        else:
-            self.logfile = open("raw.log","a")
+        Env.log = Log(self.args.logfile)
             
         if self.args.proxy:
             self.sock = self.connect(self.args.server)
@@ -30,7 +27,7 @@ class sockpuppet:
             print "Connect: socket"
             self.sock.connect((host, port))
         print "Connected..."
-        self.out_queue = OutMessages(self.sock, self.logfile)
+        self.out_queue = OutMessages(self.sock)
         self.reinitialize()
         self.register()
         self.ignoreOthers = False
@@ -59,7 +56,7 @@ class sockpuppet:
         self.handler[re.compile("^PRIVMSG ([#!&]..*) :#smake\s+([^\s]+)\s+(.*)$")] = self.smake
         self.handler[re.compile("^PRIVMSG .*")] = self.activity
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reflect (..*)")] = self.reflect
-        self.handler[re.compile("^PRIVMSG " + self.args.nick + " :discussNow (..*)")] = self.discussNow
+        self.handler[re.compile("^PRIVMSG (" + self.args.nick + ") :discussNow ([!#&][^ ]*)")] = self.discussNow
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reinit.*")] = self.reinit
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :sayto ([^:,]+)[:,](..*)")] = self.sayto
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :do ([^:,]+)[:,](..*)")] = self.do
@@ -224,12 +221,12 @@ class sockpuppet:
     def discussNow(self, message, m):
         if message.nick in self.authorized_users:
             self.enqueue("PRIVMSG " + message.nick + " :Yes, my lord, certainly.", 0)
-            self.discuss(message, m)
+            self.discuss(message, m, m.group(2))
         else:
             self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
 
             
-    def discuss(self, message, m):
+    def discuss(self, message, m, group = None):
         files = glob.glob(os.path.join(getDataFolder(), "discuss/*.txt"))
         print "Files: " + str(files)
         if len(files) <= 0:
@@ -237,9 +234,14 @@ class sockpuppet:
         f = files[random.randint(0,len(files)-1)]
         discuss = readFile(f)
         i = random.randint(4,6)
+        if None != group:
+            target = group
+        else:
+            target = m.group(1)
+            
         for l in discuss:
             l = substitute(l, message, "")
-            self.enqueue("PRIVMSG " + m.group(1) + " :" + l, i)
+            self.enqueue("PRIVMSG " + target + " :" + l, i)
             i = i + random.randint(3,5)
         self.ignoreOthers = True
         
@@ -273,7 +275,7 @@ class sockpuppet:
     def enqueue(self, msg, countdown):
         if msg[-1:] != "\n":
             msg = msg + "\n"
-        print "Enqueued: " + msg
+        Env.log.log("|" + msg)
         self.out_queue.add(msg,countdown)
 
     def send(self,msg):
@@ -283,7 +285,7 @@ class sockpuppet:
         self.sock.send(msg)
 
     def handle(self, msg):
-        self.logfile.write("<" + msg + "\n")
+        Env.log.log("<" + msg)
         message = Message(msg)
         if message.nick == self.args.nick:
             #ignore own messages
@@ -306,6 +308,9 @@ class sockpuppet:
             try:
                 msg_new = self.sock.recv(100)
             except:
+                einfo = sys.exc_info()
+                for i in range(0,len(einfo)):
+                    Env.log.log("Exception info [" + str(i) + "]: " + einfo[o])
                 time.sleep(1)
                 self.out_queue.tick()
                 if self.out_queue.empty():
