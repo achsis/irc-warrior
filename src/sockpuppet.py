@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import argparse, socket, re, random, os, time, glob, sys
+import argparse, socket, re, random, os, time, glob, sys, traceback
 import socketproxy
 from users import *
 from messages import *
@@ -308,9 +308,8 @@ class sockpuppet:
             try:
                 msg_new = self.sock.recv(100)
             except:
-                einfo = sys.exc_info()
-                for i in range(0,len(einfo)):
-                    Env.log.log("Exception info [" + str(i) + "]: " + einfo[o])
+                einfo = traceback.format_exc()
+                Env.log.log("Exception info: " + einfo)
                 time.sleep(1)
                 self.out_queue.tick()
                 if self.out_queue.empty():
