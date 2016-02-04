@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import argparse, socket, re, random, os, time, glob, sys, traceback
+import argparse, socket, re, random, os, time, glob, sys, traceback, errno
+from socket import error as socket_error
 import socketproxy
 from users import *
 from messages import *
@@ -13,25 +14,28 @@ class sockpuppet:
         random.seed()
         self.readConfig()
         self.args = self.get_args()
-
+        self.last_reacted = {}
+        self.last_triggered = {}
         Env.log = Log(self.args.logfile)
-            
-        if self.args.proxy:
-            self.sock = self.connect(self.args.server)
-        else:
-            print "Connect"
-            host = self.args.server[:self.args.server.find(":")]
-            port = int(self.args.server[self.args.server.find(":")+1:])
-            print "Connect: " + host + str(port)
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            print "Connect: socket"
-            self.sock.connect((host, port))
-        print "Connected..."
-        self.out_queue = OutMessages(self.sock)
-        self.reinitialize()
-        self.register()
-        self.ignoreOthers = False
-        self.main_loop()
+        while True:
+            if self.args.proxy:
+                self.sock = self.connect(self.args.server)
+            else:
+                print "Connect"
+                host = self.args.server[:self.args.server.find(":")]
+                port = int(self.args.server[self.args.server.find(":")+1:])
+                print "Connect: " + host + str(port)
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                print "Connect: socket"
+                self.sock.connect((host, port))
+                print "Connected..."
+                self.out_queue = OutMessages(self.sock)
+                self.reinitialize()
+                self.register()
+                self.ignoreOthers = False
+                self.main_loop()
+                Env.log.log("ERROR: Disconnected? Trying to reconnect in 10s")
+                time.sleep(10)
 
     def substitute(self, line):
         return line.replace("%n",self.args.nick)
@@ -49,10 +53,13 @@ class sockpuppet:
             word = f[len(os.path.join(getDataFolder(), "trigger/")):-4]
             self.handler[re.compile("^PRIVMSG (.+) :\s*(" + word + ")[sz]*[\s$,\.?!].*",re.I)] = self.trigger
             self.handler[re.compile("^PRIVMSG (.+) :[^^#!~]+.*\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.trigger
+            self.last_triggered[word] = 0
+
         for f in glob.glob(os.path.join(getDataFolder(), "react/*.txt")):
             word = f[len(os.path.join(getDataFolder(), "react/")):-4]
             self.handler[re.compile("^PRIVMSG (.+) :\s*(" + word + ")[sz]*[\s$,\.?!].*",re.I)] = self.react
             self.handler[re.compile("^PRIVMSG (.+) :[^^#!~]+.*\s+(" + word + ")[sz]*[\s$,\.?!].*", re.I)] = self.react
+            self.last_reacted[word] = 0
         self.handler[re.compile("^PRIVMSG ([#!&]..*) :#smake\s+([^\s]+)\s+(.*)$")] = self.smake
         self.handler[re.compile("^PRIVMSG .*")] = self.activity
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :reflect (..*)")] = self.reflect
@@ -62,10 +69,10 @@ class sockpuppet:
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :do ([^:,]+)[:,](..*)")] = self.do
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :join (..*)")] = self.join
         self.handler[re.compile("^PRIVMSG " + self.args.nick + " :quit.*")] = self.quit_bob
-        self.handler[re.compile("^PRIVMSG ([#!&]..*) :([^ ]*)\+\+.*")] = self.see_karma
-        self.handler[re.compile("^PRIVMSG ([#!&]..*) :([^ ]*)--.*")] = self.see_bad_karma
-        self.handler[re.compile("^PRIVMSG ([#!&]..*) :\s*\+\+([^ ]*)[$ ,!?\.].*")] = self.see_karma
-        self.handler[re.compile("^PRIVMSG ([#!&]..*) :\s--([^ ]*)[$ ,!?\.].*")] = self.see_bad_karma
+        self.handler[re.compile("^PRIVMSG ([#!&].*) :([^ ]*)\+\+.*")] = self.see_karma
+        self.handler[re.compile("^PRIVMSG ([#!&].*) :([^ ]*)--.*")] = self.see_bad_karma
+        self.handler[re.compile("^PRIVMSG ([#!&].*) :\s*\+\+([^ ]*)[$ ,!?\.].*")] = self.see_karma
+        self.handler[re.compile("^PRIVMSG ([#!&].*) :\s--([^ ]*)[$ ,!?\.].*")] = self.see_bad_karma
         self.handler_system[re.compile("^PING (.*)")] = self.ping
         self.handler_system[re.compile("^NOTICE " + self.args.nick + " :.*identify via .*")] = self.identify
 
@@ -103,7 +110,7 @@ class sockpuppet:
         self.users.activity(message.nick)
     
     def ping(self, message, m):
-        self.send("PONG " + m.group(1))
+        self.enqueue("PONG " + m.group(1),0)
 
     def see_karma(self, message, m):
         print "Triggered see_karma " + message.message
@@ -153,7 +160,15 @@ class sockpuppet:
                 return
         else:
             destination = message.nick
-            
+
+        word = m.group(2).lower()
+        now = int(time.time())
+        if word in self.last_triggered.keys():
+            if now - self.last_triggered[word] < 10:
+                Env.log.log("Word " + word + " was triggered already less than 7s ago. Ignore this time.")
+                return
+        self.last_triggered[word] = now 
+                        
         result = pick_random_delayed(os.path.join(getDataFolder(), "trigger/" + m.group(2).lower() + ".txt"), message, m.group(2))
         for t in result:
             (te,ti) = t
@@ -162,6 +177,13 @@ class sockpuppet:
     def react(self, message, m):
         print "Triggered react " + message.message
         print m.group(2)
+        word = m.group(2).lower()
+        now = int(time.time())
+        if word in self.last_reacted.keys():
+            if now - self.last_reacted[word] < 10:
+                Env.log.log("Word " + word + " was triggered already less than 7s ago. Ignore this time.")
+                return
+        self.last_reacted[word] = now 
         destination = m.group(1)
         if not m.group(1)[0:1] in "#&!":
             destination = message.nick
@@ -171,15 +193,14 @@ class sockpuppet:
             (te,ti) = t
             self.enqueue("PRIVMSG " + destination + " :" + te, ti)
         
-        
     def smake(self, message, m):
         if m.group(2)==self.args.nick:
-            self.send("PRIVMSG " + m.group(1) + " :" + u'\u0001' + "ACTION ducks fast" + u'\u0001')
-            self.enqueue("PRIVMSG " + m.group(1) + " :#smake " + message.nick + " with a rotten fish of justice", 0)
+            self.enqueue("PRIVMSG " + m.group(1) + " :" + u'\u0001' + "ACTION ducks fast" + u'\u0001',0)
+            self.enqueue("PRIVMSG " + m.group(1) + " :#smake " + message.nick + " with a rotten fish of justice", 1)
             
     def reflect(self, message, m):
         if message.nick in self.authorized_users:
-            self.send(m.group(1))
+            self.enqueue(m.group(1),0)
             self.enqueue("PRIVMSG " + message.nick + " :Yes, my lord, certainly.", 0)
         else:
             self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
@@ -212,8 +233,8 @@ class sockpuppet:
 
     def join(self, message, m):
         if message.nick in self.authorized_users:
-            self.send("JOIN " + m.group(1))
             self.enqueue("PRIVMSG " + message.nick + " :Yes, my lord, certainly.", 0)
+            self.enqueue("JOIN " + m.group(1),0)
         else:
             self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
             print message.nick + " not in " + str(self.authorized_users)
@@ -225,7 +246,6 @@ class sockpuppet:
         else:
             self.enqueue("PRIVMSG " + message.nick + " :No. Not for You!", 0)
 
-            
     def discuss(self, message, m, group = None):
         files = glob.glob(os.path.join(getDataFolder(), "discuss/*.txt"))
         print "Files: " + str(files)
@@ -235,6 +255,7 @@ class sockpuppet:
         discuss = readFile(f)
         i = random.randint(4,6)
         if None != group:
+            Env.log.log("Discuss target: " + group)
             target = group
         else:
             target = m.group(1)
@@ -270,19 +291,9 @@ class sockpuppet:
             m = reInit.match(l)
             if None != m:
                 self.enqueue(m.group(2), int(m.group(1))+4)
-                
 
     def enqueue(self, msg, countdown):
-        if msg[-1:] != "\n":
-            msg = msg + "\n"
-        Env.log.log("|" + msg)
         self.out_queue.add(msg,countdown)
-
-    def send(self,msg):
-        print msg
-        if msg[-1:] != "\n":
-            msg = msg + "\n"
-        self.sock.send(msg)
 
     def handle(self, msg):
         Env.log.log("<" + msg)
@@ -299,23 +310,41 @@ class sockpuppet:
                 m = k.match(message.message)
                 if None != m:
                     self.handler[k](message, m)
-        
+
     def main_loop(self):
         msg = ""
         msg_new = ""
         self.sock.setblocking(0)
+        self.connectionTimeout = 100 #Expect at least server PING at least once every 3 minutes
         while True:
             try:
                 msg_new = self.sock.recv(100)
-            except:
+                self.connectionTimeout = 100 #Expect at least server PING at least once every 3 minutes
+            except socket_error as serr:
+                if serr.errno==11:
+                    if self.connectionTimeout == 0:
+                        self.enqueue("PING :SoylenBob", 0)
+                    self.connectionTimeout = self.connectionTimeout - 1
+                    if self.connectionTimeout < -10:
+                        Env.log.log("Connection timeout? Sent PING 10s ago, nothing received ever since. Expected at least a PONG")
+                        break
+                    
+                    time.sleep(1)
+                    self.out_queue.tick()
+                    if self.out_queue.empty():
+                        self.ignoreOthers = False
+                    continue
+                else:
+                    Env.log.log("Socket error:" + str(serr.errno))
+                    break
+
+            except Exception as ex:
+                message = template.format(type(ex).__name__, ex.args)
+                print message
                 einfo = traceback.format_exc()
                 Env.log.log("Exception info: " + einfo)
-                time.sleep(1)
-                self.out_queue.tick()
-                if self.out_queue.empty():
-                    self.ignoreOthers = False
-                continue
-            
+                break
+             
             if len(msg_new) == 0:
                 continue
             

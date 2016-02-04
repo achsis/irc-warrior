@@ -15,6 +15,7 @@ class Log:
         text = timeStamp() + ":" + text
         if priority <= self.fileVerbosity:
             self.logfile.write(text)
+            self.logfile.flush()
         if priority <= self.screenVerbosity:
             print text.strip()           
 

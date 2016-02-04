@@ -11,7 +11,13 @@ class OutMessages:
         self.messages = []
         self.sock = sock
     def add(self, msg, countdown):
-        self.messages.append(OutMessage(msg,countdown))
+        if msg[-1:] != "\n":
+            msg = msg + "\n"
+        if countdown == 0:
+            self.__send(msg)
+        else:
+            Env.log.log("|" + msg)
+            self.messages.append(OutMessage(msg,countdown))
 
     def empty(self):
         return len(self.messages) == 0
@@ -23,9 +29,13 @@ class OutMessages:
                 self.messages[i].countdown = self.messages[i].countdown - 1
                 i = i + 1
             else:
-                Env.log.log(">" + self.messages[i].message)
-                self.sock.send(self.messages[i].message)
-                del self.messages[i] 
+                self.__send(self.messages[i].message)
+                del self.messages[i]
+                
+    def __send(self, message):
+        Env.log.log(">" + message)
+        self.sock.send(message)
+        
 
 class Message:
     def __init__(self, msg):
@@ -38,7 +48,7 @@ class Message:
         self.dump()
 
     def dump(self):
-        prio = 5
+        prio = 6
         Env.log.log("nick : " + self.nick, prio)
         Env.log.log("user : " + self.user, prio)
         Env.log.log("hostname : " + self.hostname, prio)
